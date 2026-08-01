@@ -1,4 +1,4 @@
-name: Build Windows Executable
+name: Release Windows Executable
 
 on:
   push:
@@ -10,25 +10,13 @@ permissions:
   contents: write
 
 jobs:
-  build-executable:
-    name: Build HomeServer EXE
-    runs-on: windows-latest
+  release-executable:
+    name: Publish HomeServer.exe Release
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install All Dependencies
-        run: npm run install:all
-
-      - name: Build Client & Package Executable
-        run: npm run package
 
       - name: Upload Executable Artifact
         uses: actions/upload-artifact@v4
@@ -44,10 +32,10 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: HomeServer Release v1.0.${{ github.run_number }}
           body: |
-            Automated production build generated from merge to `main`.
+            Production release of `homeserver.exe`.
             
-            ### Included Artifacts
-            - `homeserver.exe` (Windows x64 Standalone Executable)
+            ### Download
+            Direct standalone Windows executable ready for deployment.
           files: homeserver.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
