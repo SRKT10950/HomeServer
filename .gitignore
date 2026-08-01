@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production build artifacts
+dist/
+client/dist/
+homeserver.exe
+
+# Local data & secrets
+db_master.key
+auth.json
+cloudflare_settings.json
+db_settings.json
+port.json
+servers.json
+server/backups/
+server/bin/
+
+# Environment files & OS files
+.env
+.DS_Store
+Thumbs.db
+*.log
