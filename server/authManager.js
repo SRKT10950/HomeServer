@@ -38,11 +38,11 @@ class AuthManager {
     return this.credentials === null;
   }
 
-  hashPassword(password, salt = null) {
+  hashPassword(password, salt = null, iterations = 210000) {
     if (!salt) {
       salt = crypto.randomBytes(16).toString('hex');
     }
-    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
     return { salt, hash };
   }
 
@@ -67,8 +67,22 @@ class AuthManager {
       return { success: false, error: 'Invalid username or password.' };
     }
 
-    const { hash } = this.hashPassword(password, this.credentials.salt);
-    if (hash === this.credentials.passwordHash) {
+    // Try verifying with current default iterations (210000)
+    let { hash } = this.hashPassword(password, this.credentials.salt, 210000);
+    let isValid = hash === this.credentials.passwordHash;
+
+    // Check legacy 1000 iterations for smooth migration
+    if (!isValid) {
+      const legacyResult = this.hashPassword(password, this.credentials.salt, 1000);
+      if (legacyResult.hash === this.credentials.passwordHash) {
+        isValid = true;
+        // Upgrade legacy hash to 210000 iterations automatically
+        const upgraded = this.hashPassword(password);
+        this.saveCredentials(this.credentials.username, upgraded.salt, upgraded.hash);
+      }
+    }
+
+    if (isValid) {
       // Generate a secure session token
       const token = crypto.randomBytes(32).toString('hex');
       this.activeTokens.add(token);
