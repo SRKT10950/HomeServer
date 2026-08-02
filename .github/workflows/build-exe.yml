@@ -41,27 +41,34 @@ jobs:
         run: |
           echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to https://app.mhservice.co.in..."
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
-            -F "versionName=${VERSION_NAME}" \
-            -F "versionCode=${VERSION_CODE}" \
-            -F "changelog=Automated release from GitHub Actions build #${VERSION_CODE}" \
-            -F "apk=@homeserver.exe")
           
-          echo "HTTP Status Code: ${HTTP_STATUS}"
-          cat response.json
-          
-          if [ "$HTTP_STATUS" -eq 404 ]; then
-            echo "Package co.in.mhservice.homeserver not found. Creating new app entry..."
-            curl -s -L -A "$UA" -X POST https://app.mhservice.co.in/api/apps \
+          # Check if package co.in.mhservice.homeserver is registered
+          CHECK_STATUS=$(curl -s -L -A "$UA" -o /dev/null -w "%{http_code}" https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver)
+          echo "Package lookup HTTP Status Code: ${CHECK_STATUS}"
+
+          if [ "$CHECK_STATUS" -eq 404 ]; then
+            echo "Package co.in.mhservice.homeserver not found. Creating new app entry on app.mhservice.co.in..."
+            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps \
               -F "name=HomeServer" \
               -F "packageName=co.in.mhservice.homeserver" \
               -F "category=Tools" \
               -F "description=HomeServer Windows Standalone Service & App" \
               -F "versionName=${VERSION_NAME}" \
               -F "versionCode=${VERSION_CODE}" \
-              -F "changelog=Initial publication of HomeServer build #${VERSION_CODE}" \
-              -F "apk=@homeserver.exe"
+              -F "changelog=Initial release build #${VERSION_CODE}" \
+              -F "apk=@homeserver.exe")
+          else
+            echo "Package co.in.mhservice.homeserver exists. Publishing version update..."
+            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
+              -F "versionName=${VERSION_NAME}" \
+              -F "versionCode=${VERSION_CODE}" \
+              -F "changelog=Automated release build #${VERSION_CODE}" \
+              -F "apk=@homeserver.exe")
           fi
+          
+          echo "Publish HTTP Status Code: ${HTTP_STATUS}"
+          cat response.json
+          echo ""
 
       - name: Upload Executable Artifact
         uses: actions/upload-artifact@v4
@@ -82,7 +89,7 @@ jobs:
             
             This is the latest production package of `homeserver.exe`.
             
-            - **Direct Download (app.mhservice.co.in)**: [http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download](http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download)
+            - **Direct Download (app.mhservice.co.in)**: [https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download](https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download)
             - **GitHub Release Download**: [homeserver.exe](https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe)
           files: homeserver.exe
         env:
