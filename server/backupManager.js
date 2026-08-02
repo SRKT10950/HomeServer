@@ -135,11 +135,11 @@ class BackupManager {
       };
 
       this.history.unshift(metaEntry);
-      if (this.history.length > 50) {
+        if (this.history.length > 50) {
         const oldest = this.history.pop();
         try {
           fs.unlinkSync(path.join(BACKUPS_DIR, oldest.filename));
-        } catch (e) {}
+        } catch (e) { console.error('Failed to remove old backup file during retention cleanup:', e.message); }
       }
 
       this.saveMeta();
@@ -160,7 +160,7 @@ class BackupManager {
       const item = this.history[idx];
       try {
         fs.unlinkSync(path.join(BACKUPS_DIR, item.filename));
-      } catch (e) {}
+      } catch (e) { console.error('Failed to delete backup file:', e.message); }
       this.history.splice(idx, 1);
       this.saveMeta();
       this.notifyChanged();

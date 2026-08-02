@@ -155,9 +155,9 @@ class StaticServerManager {
               }
             }
           }
-        } catch (e) {
-          // ignore read errors
-        }
+          } catch (e) {
+            console.error('Error reading files in hosted folder when determining server type:', e.message);
+          }
       }
 
       return {
@@ -468,22 +468,22 @@ class StaticServerManager {
   }
 
   detectPhp() {
-    let candidatePath = this.phpSettings.phpPath || '';
-    
+    let candidatePath = this.phpSettings && this.phpSettings.phpPath ? this.phpSettings.phpPath : '';
+
     const testPhpBinary = (binPath) => {
       if (!binPath) return null;
       try {
         const { execSync } = require('child_process');
         const out = execSync(`"${binPath}" -v`, { stdio: [] }).toString();
-        if (out.includes('PHP')) {
+        if (out && out.includes('PHP')) {
           return {
             path: binPath,
             version: out.split(/\r?\n/)[0] || 'Unknown version',
             isCgi: binPath.toLowerCase().includes('cgi') || out.toLowerCase().includes('cgi')
           };
         }
-      } catch (e) {
-        // failed to run
+      } catch (err) {
+        console.error(`Failed to execute PHP binary at ${binPath}:`, err.message);
       }
       return null;
     };
@@ -491,49 +491,35 @@ class StaticServerManager {
     if (candidatePath) {
       const result = testPhpBinary(candidatePath);
       if (result) {
-        this.phpStatus = {
-          detected: true,
-          phpPath: result.path,
-          isCgi: result.isCgi,
-          version: result.version,
-          error: null
-        };
-        return;
-      } else {
-        this.phpStatus = {
-          detected: false,
-          phpPath: candidatePath,
-          isCgi: false,
-          version: '',
-          error: `Configured PHP executable at "${candidatePath}" is not valid or failed to execute.`
-        };
+        this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null };
         return;
       }
+      this.phpStatus = { detected: false, phpPath: candidatePath, isCgi: false, version: '', error: `Configured PHP executable at "${candidatePath}" is not valid or failed to execute.` };
+      return;
     }
 
+    // Try to discover php-cgi or php on PATH
     try {
       const { execSync } = require('child_process');
       const whereCgi = execSync('where php-cgi', { stdio: [] }).toString().trim().split(/\r?\n/)[0];
       if (whereCgi && fs.existsSync(whereCgi)) {
         const result = testPhpBinary(whereCgi);
-        if (result) {
-          this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null };
-          return;
-        }
+        if (result) { this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null }; return; }
       }
-    } catch (e) {}
+    } catch (err) {
+      console.debug('php-cgi discovery failed:', err.message);
+    }
 
     try {
       const { execSync } = require('child_process');
       const whereCli = execSync('where php', { stdio: [] }).toString().trim().split(/\r?\n/)[0];
       if (whereCli && fs.existsSync(whereCli)) {
         const result = testPhpBinary(whereCli);
-        if (result) {
-          this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null };
-          return;
-        }
+        if (result) { this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null }; return; }
       }
-    } catch (e) {}
+    } catch (err) {
+      console.debug('php CLI discovery failed:', err.message);
+    }
 
     const commonPaths = [
       'C:\\php\\php-cgi.exe',
@@ -542,34 +528,31 @@ class StaticServerManager {
       'C:\\xampp\\php\\php.exe'
     ];
 
-    const wampPhpDir = 'C:\\wamp64\\bin\\php';
-    if (fs.existsSync(wampPhpDir)) {
-      try {
+    try {
+      const wampPhpDir = 'C:\\wamp64\\bin\\php';
+      if (fs.existsSync(wampPhpDir)) {
         const versions = fs.readdirSync(wampPhpDir);
         for (const ver of versions) {
           commonPaths.push(path.join(wampPhpDir, ver, 'php-cgi.exe'));
           commonPaths.push(path.join(wampPhpDir, ver, 'php.exe'));
         }
-      } catch (e) {}
+      }
+    } catch (err) {
+      console.debug('WAMP php discovery failed:', err.message);
     }
 
     for (const p of commonPaths) {
-      if (fs.existsSync(p)) {
-        const result = testPhpBinary(p);
-        if (result) {
-          this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null };
-          return;
+      try {
+        if (fs.existsSync(p)) {
+          const result = testPhpBinary(p);
+          if (result) { this.phpStatus = { detected: true, phpPath: result.path, isCgi: result.isCgi, version: result.version, error: null }; return; }
         }
+      } catch (err) {
+        console.debug('Checking common php path failed:', p, err.message);
       }
     }
 
-    this.phpStatus = {
-      detected: false,
-      phpPath: '',
-      isCgi: false,
-      version: '',
-      error: 'PHP CGI executable not found. Please install PHP or specify a path in settings.'
-    };
+    this.phpStatus = { detected: false, phpPath: '', isCgi: false, version: '', error: 'PHP CGI executable not found. Please install PHP or specify a path in settings.' };
   }
 
   updatePhpSettings(phpPath) {
@@ -600,7 +583,7 @@ class StaticServerManager {
           return phpPathCandidate;
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error('Error resolving PHP script path:', e.message); }
     return null;
   }
 
@@ -701,7 +684,7 @@ class StaticServerManager {
         console.warn(`PHP CGI process timed out (30s limit). Killing PID ${phpProcess.pid}`);
         try {
           phpProcess.kill('SIGKILL');
-        } catch (e) {}
+        } catch (e) { console.error('Error while probing PHP binary stdout/stderr:', e.message); }
         if (!res.headersSent) {
           res.status(504).send('504 Gateway Timeout: PHP script execution exceeded the 30-second limit.');
         }
@@ -713,7 +696,7 @@ class StaticServerManager {
         console.log(`HTTP connection closed. Killing PHP CGI process (PID: ${phpProcess.pid})`);
         try {
           phpProcess.kill('SIGKILL');
-        } catch (e) {}
+        } catch (e) { console.error('Error while handling PHP process pipe/cleanup:', e.message); }
       }
     });
 

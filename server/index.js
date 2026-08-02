@@ -17,6 +17,7 @@ const CloudflareApi = require('./cloudflareApi');
 const DbManager = require('./dbManager');
 const authManager = require('./authManager');
 const SystemPowerManager = require('./systemPowerManager');
+const UpdateManager = require('./updateManager');
 
 // Route modules
 const authRouter = require('./routes/auth');
@@ -82,7 +83,7 @@ if (fs.existsSync(PORT_CONFIG_PATH)) {
 } else {
   try {
     fs.writeFileSync(PORT_CONFIG_PATH, JSON.stringify({ port: 5000, dbPort: 443 }, null, 2), 'utf8');
-  } catch (e) {}
+  } catch (e) { console.error('Error writing default port.json:', e.message); }
 }
 
 const app = express();
@@ -111,6 +112,8 @@ const dbManager = new DbManager(wsBroadcast, serviceErrorLogger);
 const proxyManager = new ProxyManager(wsBroadcast);
 const backupManager = new BackupManager(wsBroadcast, dbManager, serviceErrorLogger);
 const systemPowerManager = new SystemPowerManager(wsBroadcast, serviceErrorLogger);
+const updateManager = new UpdateManager(wsBroadcast, serviceErrorLogger, baseDir);
+updateManager.scheduleDailyCheck();
 
 // Global Exception & Rejection Isolation Handlers
 process.on('uncaughtException', (err) => {
@@ -314,7 +317,7 @@ app.use('/api/tunnels', createTunnelRouter(tunnelManager));
 app.use('/api', createStaticServerRouter(staticServerManager));
 app.use('/api/cloudflare', createCloudflareRouter(cfSettings, saveSettings, ddnsSettings, saveDdnsSettings, broadcastDdnsSettings, checkDDNS, serviceErrorLogger));
 app.use('/api', createDatabaseRouter(dbManager, backupManager));
-app.use('/api', createSystemRouter(tunnelManager, staticServerManager, proxyManager, systemPowerManager, serviceErrorLogger, baseDir));
+app.use('/api', createSystemRouter(tunnelManager, staticServerManager, proxyManager, systemPowerManager, serviceErrorLogger, baseDir, updateManager));
 
 // Wildcard Reverse Proxy handler
 app.all('/proxy/:ruleId/:subPath(*)?', (req, res) => {
@@ -361,6 +364,7 @@ wss.on('connection', (socket) => {
   socket.send(JSON.stringify({ type: 'database_backups', data: backupManager.getBackupList() }));
   socket.send(JSON.stringify({ type: 'ddns_status', data: ddnsSettings }));
   socket.send(JSON.stringify({ type: 'power_schedule_status', data: systemPowerManager.getDashboardData() }));
+  socket.send(JSON.stringify({ type: 'update_status', data: updateManager.getState() }));
 
   socket.on('close', () => {
     console.log('WS Client disconnected');
@@ -369,7 +373,7 @@ wss.on('connection', (socket) => {
 
 // Telemetry interval (2s)
 let cachedOs = null;
-si.osInfo().then(info => cachedOs = info).catch(console.error);
+  si.osInfo().then(info => cachedOs = info).catch(err => console.error('si.osInfo() failed:', err && err.message ? err.message : err));
 
 let dbCheckCounter = 0;
 
@@ -379,7 +383,9 @@ setInterval(async () => {
   dbCheckCounter++;
   if (dbCheckCounter >= 5) {
     dbCheckCounter = 0;
-    dbManager.testConnection().then(() => dbManager.notifyChanged()).catch(() => {});
+    dbManager.testConnection().then(() => dbManager.notifyChanged()).catch((err) => {
+      console.error('dbManager.testConnection failed during periodic check:', err && err.message ? err.message : err);
+    });
   }
 
   try {

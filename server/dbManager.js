@@ -135,14 +135,14 @@ class DbManager {
     for (const dbName in this.pools) {
       try {
         await this.pools[dbName].end();
-      } catch (e) {}
+      } catch (e) { console.error(`Failed to end pool for db ${dbName}:`, e.message); }
     }
     this.pools = {};
 
     if (this.pool) {
       try {
         await this.pool.end();
-      } catch (e) {}
+      } catch (e) { console.error('Failed to end main pool:', e.message); }
     }
 
     if (!this.config.host) {
@@ -343,7 +343,7 @@ class DbManager {
     if (this.pools[dbName]) {
       try {
         await this.pools[dbName].end();
-      } catch (e) {}
+      } catch (e) { console.error(`Failed to end pool for ${dbName} during config save:`, e.message); }
       delete this.pools[dbName];
     }
 
@@ -359,7 +359,7 @@ class DbManager {
       if (this.pools[dbName]) {
         try {
           await this.pools[dbName].end();
-        } catch (e) {}
+        } catch (e) { console.error(`Failed to end pool for ${dbName} during deleteDatabaseConfig:`, e.message); }
         delete this.pools[dbName];
       }
       this.notifyChanged();

@@ -127,7 +127,12 @@ function createCloudflareRouter(cfSettings, saveSettings, ddnsSettings, saveDdns
     broadcastDdnsSettings();
     
     if (ddnsSettings.enabled) {
-      checkDDNS().catch(() => {});
+      checkDDNS().catch((err) => {
+        console.error('checkDDNS invocation failed:', err && err.message ? err.message : err);
+        if (serviceErrorLogger) {
+          serviceErrorLogger.logError('Cloudflare Sync', 'ddns_check_error', 'checkDDNS failed during DDNS enabling', err && err.message ? err.message : String(err));
+        }
+      });
     }
     
     res.json({ success: true, ddns: ddnsSettings });

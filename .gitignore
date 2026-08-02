@@ -14,6 +14,9 @@ cloudflare_settings.json
 db_settings.json
 port.json
 servers.json
+server/power_settings.json
+server/service_errors.json
+server/update_settings.json
 server/backups/
 server/bin/
 
