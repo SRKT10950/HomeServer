@@ -31,20 +31,21 @@ class UpdateManager {
 
   loadCurrentVersion() {
     try {
+      const serverPkg = require('./package.json');
+      if (serverPkg && serverPkg.version) return serverPkg.version;
+    } catch (e) {}
+    try {
+      const rootPkg = require('../package.json');
+      if (rootPkg && rootPkg.version) return rootPkg.version;
+    } catch (e) {}
+    try {
       const rootPkgPath = path.join(this.baseDir, 'package.json');
-      const serverPkgPath = path.join(this.baseDir, 'server', 'package.json');
       if (fs.existsSync(rootPkgPath)) {
         const pkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
         if (pkg.version) return pkg.version;
       }
-      if (fs.existsSync(serverPkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(serverPkgPath, 'utf8'));
-        if (pkg.version) return pkg.version;
-      }
-    } catch (e) {
-      console.error('Error reading current version from package.json:', e.message);
-    }
-    return '1.0.0';
+    } catch (e) {}
+    return '1.0.2';
   }
 
   loadSettings() {

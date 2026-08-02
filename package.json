@@ -1,6 +1,6 @@
 {
   "name": "homeserver-root",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "install:all": "npm install && npm install --prefix server && npm install --prefix client --legacy-peer-deps",
