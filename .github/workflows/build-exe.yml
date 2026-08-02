@@ -40,36 +40,54 @@ jobs:
 
       - name: Publish Executable to app.mhservice.co.in
         run: |
-          echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to https://app.mhservice.co.in..."
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          
-          # Check if package co.in.mhservice.homeserver is registered
-          CHECK_STATUS=$(curl -s -L -A "$UA" -o /dev/null -w "%{http_code}" https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver)
+          SERVER_URL="https://app.mhservice.co.in"
+          PACKAGE_NAME="co.in.mhservice.homeserver"
+
+          echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to ${SERVER_URL}..."
+
+          # Check package status (Returns 200 if exists, 404 if not found, 403 if Cloudflare blocked)
+          CHECK_STATUS=$(curl -s -L -A "$UA" -o /dev/null -w "%{http_code}" "${SERVER_URL}/api/apps/package/${PACKAGE_NAME}")
           echo "Package lookup HTTP Status Code: ${CHECK_STATUS}"
 
-          if [ "$CHECK_STATUS" -eq 404 ]; then
-            echo "Package co.in.mhservice.homeserver not found. Creating new app entry on app.mhservice.co.in..."
-            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps \
+          if [ "$CHECK_STATUS" -eq 403 ]; then
+            echo "❌ Cloudflare WAF blocked the request (HTTP 403)."
+            echo "Please deploy a Custom WAF Skip Rule in Cloudflare Dashboard for URI path '/api/'"
+            exit 1
+
+          elif [ "$CHECK_STATUS" -eq 404 ]; then
+            echo "Package '${PACKAGE_NAME}' not found. Registering new app entry..."
+            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST "${SERVER_URL}/api/apps" \
               -F "name=HomeServer" \
-              -F "packageName=co.in.mhservice.homeserver" \
+              -F "packageName=${PACKAGE_NAME}" \
               -F "category=Tools" \
               -F "description=HomeServer Windows Standalone Service & App" \
               -F "versionName=${VERSION_NAME}" \
               -F "versionCode=${VERSION_CODE}" \
               -F "changelog=Initial release build #${VERSION_CODE}" \
               -F "apk=@homeserver.exe")
-          else
-            echo "Package co.in.mhservice.homeserver exists. Publishing version update..."
-            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
+
+          elif [ "$CHECK_STATUS" -eq 200 ]; then
+            echo "Package '${PACKAGE_NAME}' exists. Publishing version update..."
+            HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST "${SERVER_URL}/api/apps/package/${PACKAGE_NAME}/version" \
               -F "versionName=${VERSION_NAME}" \
               -F "versionCode=${VERSION_CODE}" \
               -F "changelog=Automated release build #${VERSION_CODE}" \
               -F "apk=@homeserver.exe")
+
+          else
+            echo "Unexpected HTTP Status: ${CHECK_STATUS}"
+            exit 1
           fi
-          
+
           echo "Publish HTTP Status Code: ${HTTP_STATUS}"
           cat response.json
           echo ""
+
+          if [ "$HTTP_STATUS" -ge 400 ]; then
+            echo "❌ Publish failed with status ${HTTP_STATUS}"
+            exit 1
+          fi
 
       - name: Upload Executable Artifact
         uses: actions/upload-artifact@v4
@@ -91,7 +109,7 @@ jobs:
             This is the latest production package of `homeserver.exe`.
             
             - **Direct Download (app.mhservice.co.in)**: [https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download](https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download)
-            - **GitHub Release Download**: [homeserver.exe](https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe)
+            - **GitHub Release Download**: [https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe](https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe)
           files: homeserver.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
