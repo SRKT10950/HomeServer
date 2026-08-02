@@ -10,7 +10,7 @@ class UpdateManager {
     this.baseDir = baseDir || process.cwd();
     this.settingsPath = path.join(this.baseDir, 'update_settings.json');
     this.packageName = 'co.in.mhservice.homeserver';
-    this.apiEndpoint = `http://app.mhservice.co.in/api/apps/package/${this.packageName}`;
+    this.apiEndpoint = `https://app.mhservice.co.in/api/apps/package/${this.packageName}`;
 
     this.currentVersion = this.loadCurrentVersion();
     this.state = {
@@ -123,12 +123,18 @@ class UpdateManager {
 
     try {
       console.log(`Checking for updates from ${this.apiEndpoint}...`);
-      const response = await axios.get(this.apiEndpoint, { timeout: 10000 });
+      const response = await axios.get(this.apiEndpoint, { 
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json'
+        }
+      });
       const data = response.data || {};
 
       // Parse payload from app.mhservice.co.in
       const remoteVersion = data.versionName || data.version || (data.latest && data.latest.versionName) || null;
-      const remoteDownloadUrl = data.apkUrl || data.downloadUrl || (data.latest && data.latest.apkUrl) || `http://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
+      const remoteDownloadUrl = data.apkUrl || data.downloadUrl || (data.latest && data.latest.apkUrl) || `https://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
       const changelog = data.changelog || data.description || (data.latest && data.latest.changelog) || 'No release notes provided.';
 
       this.state.lastCheckTime = new Date().toISOString();
@@ -181,7 +187,7 @@ class UpdateManager {
       throw new Error('Update is already in progress.');
     }
 
-    const downloadUrl = this.state.downloadUrl || `http://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
+    const downloadUrl = this.state.downloadUrl || `https://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
     const tempExePath = path.join(this.baseDir, 'homeserver_new.exe');
 
     this.state.downloading = true;
@@ -195,7 +201,10 @@ class UpdateManager {
         method: 'get',
         url: downloadUrl,
         responseType: 'stream',
-        timeout: 60000
+        timeout: 60000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
       });
 
       const totalLength = parseInt(response.headers['content-length'] || '0', 10);
