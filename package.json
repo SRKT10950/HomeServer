@@ -6,7 +6,7 @@
     "install:all": "npm install && npm install --prefix server && npm install --prefix client --legacy-peer-deps",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build:client": "npm run build --prefix client",
-    "package": "npm run build:client && pkg server/package.json -t node20-win-x64 -o homeserver.exe"
+    "package": "npm run build:client && pkg server/package.json -t node18-win-x64 -o homeserver.exe"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
