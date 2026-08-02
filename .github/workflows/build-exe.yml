@@ -39,8 +39,9 @@ jobs:
 
       - name: Publish Executable to app.mhservice.co.in
         run: |
-          echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to http://app.mhservice.co.in..."
-          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
+          echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to https://app.mhservice.co.in..."
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          HTTP_STATUS=$(curl -s -L -A "$UA" -o response.json -w "%{http_code}" -X POST https://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
             -F "versionName=${VERSION_NAME}" \
             -F "versionCode=${VERSION_CODE}" \
             -F "changelog=Automated release from GitHub Actions build #${VERSION_CODE}" \
@@ -51,7 +52,7 @@ jobs:
           
           if [ "$HTTP_STATUS" -eq 404 ]; then
             echo "Package co.in.mhservice.homeserver not found. Creating new app entry..."
-            curl -s -X POST http://app.mhservice.co.in/api/apps \
+            curl -s -L -A "$UA" -X POST https://app.mhservice.co.in/api/apps \
               -F "name=HomeServer" \
               -F "packageName=co.in.mhservice.homeserver" \
               -F "category=Tools" \
