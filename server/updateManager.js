@@ -132,10 +132,17 @@ class UpdateManager {
       });
       const data = response.data || {};
 
-      // Parse payload from app.mhservice.co.in
-      const remoteVersion = data.versionName || data.version || (data.latest && data.latest.versionName) || null;
-      const remoteDownloadUrl = data.apkUrl || data.downloadUrl || (data.latest && data.latest.apkUrl) || `https://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
-      const changelog = data.changelog || data.description || (data.latest && data.latest.changelog) || 'No release notes provided.';
+      // Parse payload from app.mhservice.co.in (which returns { latestVersion: { versionName, apkPath, changelog } })
+      const latestObj = data.latestVersion || data.latest || data;
+      const remoteVersion = latestObj.versionName || latestObj.version || data.versionName || null;
+      let rawApkPath = latestObj.apkPath || latestObj.apkUrl || latestObj.downloadUrl || data.downloadUrl || null;
+      
+      let remoteDownloadUrl = `https://app.mhservice.co.in/api/apps/package/${this.packageName}/download`;
+      if (rawApkPath) {
+        remoteDownloadUrl = rawApkPath.startsWith('http') ? rawApkPath : `https://app.mhservice.co.in${rawApkPath.startsWith('/') ? '' : '/'}${rawApkPath}`;
+      }
+
+      const changelog = latestObj.changelog || latestObj.description || data.changelog || data.description || 'No release notes provided.';
 
       this.state.lastCheckTime = new Date().toISOString();
 
@@ -147,8 +154,8 @@ class UpdateManager {
         console.log(`New version available: ${remoteVersion} (Current: ${this.currentVersion})`);
       } else {
         this.state.hasUpdate = false;
-        this.state.latestVersion = this.currentVersion;
-        console.log(`HomeServer is up to date (Version ${this.currentVersion}).`);
+        this.state.latestVersion = remoteVersion || this.currentVersion;
+        console.log(`HomeServer is up to date (Version ${this.currentVersion}). Remote version: ${remoteVersion || 'N/A'}`);
       }
 
       this.saveSettings();
