@@ -11,12 +11,56 @@ permissions:
 
 jobs:
   release-executable:
-    name: Publish HomeServer.exe Release
+    name: Build & Publish HomeServer.exe
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install All Dependencies
+        run: npm run install:all
+
+      - name: Package Executable
+        run: npm run package
+
+      - name: Extract Version Info
+        id: version_info
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version || '1.0.0')")
+          echo "VERSION_NAME=${VERSION}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Publish Executable to app.mhservice.co.in
+        run: |
+          echo "Publishing version ${VERSION_NAME} (code: ${VERSION_CODE}) to http://app.mhservice.co.in..."
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/version \
+            -F "versionName=${VERSION_NAME}" \
+            -F "versionCode=${VERSION_CODE}" \
+            -F "changelog=Automated release from GitHub Actions build #${VERSION_CODE}" \
+            -F "apk=@homeserver.exe")
+          
+          echo "HTTP Status Code: ${HTTP_STATUS}"
+          cat response.json
+          
+          if [ "$HTTP_STATUS" -eq 404 ]; then
+            echo "Package co.in.mhservice.homeserver not found. Creating new app entry..."
+            curl -s -X POST http://app.mhservice.co.in/api/apps \
+              -F "name=HomeServer" \
+              -F "packageName=co.in.mhservice.homeserver" \
+              -F "category=Tools" \
+              -F "description=HomeServer Windows Standalone Service & App" \
+              -F "versionName=${VERSION_NAME}" \
+              -F "versionCode=${VERSION_CODE}" \
+              -F "changelog=Initial publication of HomeServer build #${VERSION_CODE}" \
+              -F "apk=@homeserver.exe"
+          fi
 
       - name: Upload Executable Artifact
         uses: actions/upload-artifact@v4
@@ -37,7 +81,8 @@ jobs:
             
             This is the latest production package of `homeserver.exe`.
             
-            - **Direct Download**: [homeserver.exe](https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe)
+            - **Direct Download (app.mhservice.co.in)**: [http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download](http://app.mhservice.co.in/api/apps/package/co.in.mhservice.homeserver/download)
+            - **GitHub Release Download**: [homeserver.exe](https://github.com/SRKT10950/HomeServer/releases/latest/download/homeserver.exe)
           files: homeserver.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -135,10 +135,10 @@ class SystemPowerManager {
       // Clean up XML files
       try {
         if (fs.existsSync(wakeXmlPath)) fs.unlinkSync(wakeXmlPath);
-      } catch (e) {}
+      } catch (e) { console.error('Failed to remove temporary wake task XML:', e.message); }
       try {
         if (fs.existsSync(shutdownXmlPath)) fs.unlinkSync(shutdownXmlPath);
-      } catch (e) {}
+      } catch (e) { console.error('Failed to remove temporary shutdown task XML:', e.message); }
     }
   }
 

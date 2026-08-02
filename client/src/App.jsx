@@ -63,6 +63,7 @@ function App() {
   const [databaseBackups, setDatabaseBackups] = useState({ history: [], schedule: 'disabled' });
   const [ddnsStatus, setDdnsStatus] = useState({ enabled: false, hostname: '', lastSync: null, lastIp: '', error: null });
   const [powerScheduleStatus, setPowerScheduleStatus] = useState({ enabled: false, action: 'sleep', shutdownTime: '23:00', startTime: '07:00', isAdmin: false, error: null });
+  const [updateStatus, setUpdateStatus] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('hs_theme') || 'dark');
   
   // Auth state
@@ -205,6 +206,9 @@ function App() {
             break;
           case 'power_schedule_status':
             setPowerScheduleStatus(data);
+            break;
+          case 'update_status':
+            setUpdateStatus(data);
             break;
           default:
             break;
@@ -606,6 +610,7 @@ function App() {
             databaseStatus={databaseStatus}
             apiMetrics={apiMetrics}
             serviceErrors={serviceErrors}
+            updateStatus={updateStatus}
           />
         )}
         

@@ -482,7 +482,7 @@ local_addr = "127.0.0.1:${localPort}"
       if (fs.existsSync(configPath)) {
         try {
           fs.unlinkSync(configPath);
-        } catch (e) {}
+        } catch (e) { console.error(`Failed to remove rathole config file ${configPath}:`, e.message); }
       }
       if (wasUnexpected && code !== 0 && this.errorLogger) {
         this.errorLogger.logError('Tunnel', 'process_exited', `Rathole tunnel "${id}" exited unexpectedly with code ${code}`, {
@@ -527,7 +527,7 @@ local_addr = "127.0.0.1:${localPort}"
     if (tunnel.configPath && fs.existsSync(tunnel.configPath)) {
       try {
         fs.unlinkSync(tunnel.configPath);
-      } catch (e) {}
+      } catch (e) { console.error('Error during tunnel load auto-start sequence:', e.message); }
     }
 
     tunnel.status = 'stopped';

@@ -47,7 +47,7 @@ class ApiMonitor {
             if (typeof body === 'string') {
               try {
                 parsed = JSON.parse(body);
-              } catch (e) {}
+              } catch (e) { console.error('Error parsing response body in ApiMonitor:', e); }
             }
             res.locals.errorMessage = parsed.error || parsed.message || (typeof body === 'string' ? body : JSON.stringify(body));
           }

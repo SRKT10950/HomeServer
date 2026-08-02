@@ -10,7 +10,8 @@ function createSystemRouter(
   proxyManager,
   systemPowerManager,
   serviceErrorLogger,
-  baseDir
+  baseDir,
+  updateManager
 ) {
   const router = express.Router();
 
@@ -92,7 +93,7 @@ function createSystemRouter(
     
     try {
       if (fs.existsSync(vbsPath)) fs.unlinkSync(vbsPath);
-    } catch (e) {}
+    } catch (e) { console.error('Failed to remove existing startup VBScript file:', e.message); }
     await runCommand('schtasks /delete /tn "HomeServer" /f');
 
     const execPath = process.execPath;
@@ -245,6 +246,32 @@ WshShell.Run """${execPath}""", 0, false
     try {
       await systemPowerManager.executeManualAction(action);
       res.json({ success: true, message: `System will enter ${action} in 2 seconds.` });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // System Update APIs
+  router.get('/system/update/status', (req, res) => {
+    if (!updateManager) return res.status(503).json({ error: 'Update manager not initialized.' });
+    res.json(updateManager.getState());
+  });
+
+  router.post('/system/update/check', async (req, res) => {
+    if (!updateManager) return res.status(503).json({ error: 'Update manager not initialized.' });
+    try {
+      const state = await updateManager.checkForUpdates(true);
+      res.json({ success: true, state });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/system/update/apply', async (req, res) => {
+    if (!updateManager) return res.status(503).json({ error: 'Update manager not initialized.' });
+    try {
+      const result = await updateManager.applyUpdate();
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

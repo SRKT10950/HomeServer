@@ -20,7 +20,11 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  Download,
+  RefreshCw,
+  ArrowUpCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 // Format bytes to readable string (GB, MB, etc)
@@ -134,11 +138,15 @@ function Dashboard({
   serversCount,
   databaseStatus,
   apiMetrics,
-  serviceErrors
+  serviceErrors,
+  updateStatus
 }) {
   const [startupMode, setStartupMode] = useState('disabled');
   const [startupSupported, setStartupSupported] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [updateActionMsg, setUpdateActionMsg] = useState('');
 
   const [serviceFilter, setServiceFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,6 +205,36 @@ function Dashboard({
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateActionMsg('');
+    try {
+      const res = await fetch(`${API_BASE}/api/system/update/check`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to check for updates.');
+      setUpdateActionMsg(data.state?.hasUpdate ? `New version v${data.state.latestVersion} available!` : 'HomeServer is on the latest version.');
+    } catch (err) {
+      setUpdateActionMsg('Error checking update: ' + err.message);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!window.confirm('Download and apply update now? HomeServer will restart automatically.')) return;
+    setApplyingUpdate(true);
+    setUpdateActionMsg('Downloading update executable...');
+    try {
+      const res = await fetch(`${API_BASE}/api/system/update/apply`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to apply update.');
+      setUpdateActionMsg(data.message || 'Update initiated. Server is restarting...');
+    } catch (err) {
+      setUpdateActionMsg('Error applying update: ' + err.message);
+      setApplyingUpdate(false);
     }
   };
 
@@ -461,6 +499,88 @@ function Dashboard({
           </div>
         </div>
       )}
+
+      {/* System Version & Auto-Update Card */}
+      <div className="card" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={24} style={{ color: 'var(--accent-secondary)' }} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ fontSize: '16px', margin: 0 }}>System Version & Updates</h3>
+                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                  v{updateStatus?.currentVersion || '1.0.0'}
+                </span>
+                {updateStatus?.hasUpdate && (
+                  <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                    Update Available: v{updateStatus?.latestVersion}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                Automatic daily update check is active. Published releases are served from app.mhservice.co.in.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCheckUpdate}
+              disabled={checkingUpdate || applyingUpdate || updateStatus?.checking}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', fontSize: '13px' }}
+            >
+              <RefreshCw size={14} className={checkingUpdate || updateStatus?.checking ? 'spin' : ''} />
+              {checkingUpdate || updateStatus?.checking ? 'Checking...' : 'Check for Updates'}
+            </button>
+
+            {updateStatus?.hasUpdate && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleApplyUpdate}
+                disabled={applyingUpdate || updateStatus?.downloading}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', fontSize: '13px', backgroundColor: '#22c55e', borderColor: '#16a34a', color: '#ffffff' }}
+              >
+                <ArrowUpCircle size={15} />
+                {applyingUpdate || updateStatus?.downloading 
+                  ? `Updating... (${updateStatus?.downloadProgress || 0}%)` 
+                  : `Update Now (v${updateStatus?.latestVersion})`}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <strong>Last Checked:</strong> {updateStatus?.lastCheckTime ? new Date(updateStatus.lastCheckTime).toLocaleString() : 'Not checked yet today'}
+          </div>
+          {updateActionMsg && (
+            <div style={{ color: updateActionMsg.includes('Error') ? '#ef4444' : '#38bdf8', fontWeight: 500 }}>
+              {updateActionMsg}
+            </div>
+          )}
+          {updateStatus?.error && !updateActionMsg && (
+            <div style={{ color: '#ef4444' }}>
+              ⚠️ {updateStatus.error}
+            </div>
+          )}
+        </div>
+
+        {updateStatus?.hasUpdate && updateStatus?.changelog && (
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px', fontSize: '13px' }}>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Info size={14} style={{ color: '#38bdf8' }} /> What's New in v{updateStatus.latestVersion}:
+            </div>
+            <div style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+              {updateStatus.changelog}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Diagnostics Divider Title */}
       <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
