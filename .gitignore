@@ -17,6 +17,7 @@ servers.json
 server/power_settings.json
 server/service_errors.json
 server/update_settings.json
+update_settings.json
 server/backups/
 server/bin/
 
